@@ -12,6 +12,9 @@ This is not an official API support and etc. This is just a scraper that is usin
 
 <a href="https://www.buymeacoffee.com/Usom2qC" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-blue.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
 
+<a href="https://discord.gg/7SZaUs4" target="_blank"><img src="https://i.imgur.com/dUwek7T.jpg" alt="Discord Server" width="435" height="190" ></a>
+
+
 ---
 ## Content
 - [Features](#features)
@@ -32,11 +35,16 @@ This is not an official API support and etc. This is just a scraper that is usin
 	    - [Options](#options)
 	    - [Use with Promises](#promise)
 	    - [Use with Events](#event)
+	    - [How to access/download video](#download-video)
 	    - [Output Example](#json-output-example)
 	        - [Video Feed Methods](#video-feed)
 	        - [getUserProfileInfo](#getUserProfileInfo)
 	        - [getHashtagInfo](#getHashtagInfo)
 	        - [getVideoMeta](#getVideoMeta)
+            - [getMusicInfo](#getMusicInfo)
+## Important notes
+- For now you won't be able to download video without the watermark
+
 ## Features
 
 -   Download **unlimited** post metadata from the User, Hashtag, Trends, or Music-Id pages
@@ -58,7 +66,7 @@ This is not an official API support and etc. This is just a scraper that is usin
 -   [x] Download video without the watermark
 -   [x] Indicate in the output file(csv/json) if the video was downloaded or not
 -   [x] Build and run from Docker
--   [x] CLI: Scrape and download in batch
+-   [x] CLI: Scrape and download in batchu
 -   [x] CLi: Load proxies from a file
 -   [x] CLI: Optional ZIP
 -   [x] Renew API
@@ -224,6 +232,7 @@ docker run -v /User/blah/downloads:/usr/app/files tiktok-scraper user tiktok -d 
 .getHashtagInfo('HASHTAG', options) // Get hashtag information
 .signUrl('URL', options) // Get signature for the request
 .getVideoMeta('WEB_VIDEO_URL', options) // Get video meta info, including video url without the watermark
+.getMusicInfo('https://www.tiktok.com/music/original-sound-6801885499343571718', options) // Get music metadata
 ```
 
 ### Options
@@ -264,9 +273,14 @@ const options = {
     // 'na' to skip this step
     filetype: `na`,
 
-    // Custom User-Agent
-    // {string default: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{RANDOM_VERSION}.0.3987.122 Safari/537.36' }
-    userAgent: '',
+    // Set custom headers: user-agent, cookie and etc
+    // NOTE: When you parse video feed or single video metadata then in return you will receive {headers} object
+    // that was used to extract the information and in order to access and download video through received {videoUrl} value you need to use same headers
+    headers: {
+        'User-Agent': "BLAH",
+        Referer: 'https://www.tiktok.com/',
+        Cookie: `tt_webid_v2=68dssds`,
+    },
     
     // Download video without the watermark: {boolean default: false}
     // Set to true to download without the watermark
@@ -361,7 +375,9 @@ const rp = require('request-promise');
         const userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.122 Safari/537.36';
         const url = 'https://m.tiktok.com/share/item/list?secUid=&id=355503&type=3&count=30&minCursor=0&maxCursor=0&shareUid=&lang=';
 
-        const signature = await TikTokScraper.signUrl(url, { userAgent });
+        const signature = await TikTokScraper.signUrl(url, { headers:{
+            'User-Agent': userAgent,
+        } });
 
         const result = await rp({
             uri: `${url}&_signature=${signature}`,
@@ -418,6 +434,40 @@ hashtag.on('error', error => {
 });
 hashtag.scrape();
 ```
+### Download Video
+**This part is related to the MODULE usage (NOT THE CLI)**
+
+The **{videoUrl}** value is binded to the cookie value **{tt_webid_v2}** that can contain **any value**
+
+#### Method 1: default headers
+
+When you extract videos from the user, hashtag, music, trending feed or single video then in response besides the video metadata you will receive **headers** object that will contain params that were used to extract the data. Here is the important part, **in order to access/download video through {videoUrl} value you need to use same {headers} values**.
+
+```json
+    headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.80 Safari/537.36",
+        "Referer": "https://www.tiktok.com/",
+        "Cookie": "tt_webid_v2=689854141086886123"
+    },
+```
+#### Method 2: custom headers
+
+You can pass your own headers with the **{options}**.
+
+```javascript
+const headers = {
+    "User-Agent": "BOB",
+    "Referer": "https://www.tiktok.com/",
+    "Cookie": "tt_webid_v2=BOB"
+}
+getVideoMeta('WEB_VIDEO_URL', {headers})
+user('WEB_VIDEO_URL', {headers})
+hashtag('WEB_VIDEO_URL', {headers})
+trend('WEB_VIDEO_URL', {headers})
+music('WEB_VIDEO_URL', {headers})
+// And after you can access video through {videoUrl} value by using same custom headers
+```
+
 
 ### Json Output Example
 
@@ -425,6 +475,11 @@ hashtag.scrape();
 Example output for the methods: **user, hashtag, trend, music, userEvent, hashtagEvent, musicEvent, trendEvent**
 ```javascript
 {
+    headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.80 Safari/537.36',
+        Referer: 'https://www.tiktok.com/',
+        Cookie: 'tt_webid_v2=689854141086886123'
+    },
     collector:[{
         id: 'VIDEO_ID',
         text: 'CAPTION',
@@ -520,32 +575,65 @@ Example output for the methods: **user, hashtag, trend, music, userEvent, hashta
 
 ```javascript
 {
-    id: '6807491984882765062',
-    text: 'We’re kicking off the #happyathome live stream series today at 5pm PT!',
-    createTime: '1584992742',
-    authorMeta: { id: '6812221792183403526', name: 'blah' },
-    musicMeta:{
-        musicId: '6822233276137213677',
-        musicName: 'blah',
-        musicAuthor: 'blah'
+    headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.80 Safari/537.36',
+        Referer: 'https://www.tiktok.com/',
+        Cookie: 'tt_webid_v2=689854141086886123'
     },
-    imageUrl: 'IMAGE_URL',
-    videoUrl: 'VIDEO_URL',
-    videoUrlNoWaterMark: 'VIDEO_URL_WITHOUT_THE_WATERMARK',
-    videoMeta: { width: 480, height: 864, ratio: 14, duration: 14 },
-    covers:{
-        default: 'COVER_URL',
-        origin: 'COVER_URL'
-    },
-    diggCount: 49292,
-    shareCount: 339,
-    playCount: 614678,
-    commentCount: 4023,
-    downloaded: false,
-    hashtags: [],
+    collector:[{
+        id: '6807491984882765062',
+        text: 'We’re kicking off the #happyathome live stream series today at 5pm PT!',
+        createTime: '1584992742',
+        authorMeta: { id: '6812221792183403526', name: 'blah' },
+        musicMeta:{
+            musicId: '6822233276137213677',
+            musicName: 'blah',
+            musicAuthor: 'blah'
+        },
+        imageUrl: 'IMAGE_URL',
+        videoUrl: 'VIDEO_URL',
+        videoUrlNoWaterMark: 'VIDEO_URL_WITHOUT_THE_WATERMARK',
+        videoMeta: { width: 480, height: 864, ratio: 14, duration: 14 },
+        covers:{
+            default: 'COVER_URL',
+            origin: 'COVER_URL'
+        },
+        diggCount: 49292,
+        shareCount: 339,
+        playCount: 614678,
+        commentCount: 4023,
+        downloaded: false,
+        hashtags: [],
+    }]
 }
 ```
 
+##### getMusicInfo
+
+```javascript
+{
+    musicId: '6801885499343571718',
+    musicName: 'original sound',
+    uniqueId: 'tiktok',
+    secUid: 'MS4wLjABAAAAv7iSuuXDJGDvJkmH_vz1qkDZYo1apxgzaxdBSeIuPiM',
+    authorId: '107955',
+    authorName: 'tiktok',
+    playUrl: {
+        Uri: 'musically-maliva-obj/1660617654568981.mp3',
+        UrlList: ['https://p16-va-tiktok.ibyteimg.com/obj/musically-maliva-obj/1660617654568981.mp3'],
+    },
+    covers: ['https://p16-va-tiktok.ibyteimg.com/img/musically-maliva-obj/1645136815763462~c5_100x100.jpeg'],
+    posts: 214,
+    original: true,
+    authorCovers: ['https://p16-va-tiktok.ibyteimg.com/img/musically-maliva-obj/1645136815763462~c5_720x720.jpeg'],
+    coversMedium: ['https://p16-va-tiktok.ibyteimg.com/img/musically-maliva-obj/1645136815763462~c5_720x720.jpeg'],
+    playToken:
+        'eyJHZXRQbGF5SW5mb1Rva2VuIjoiQWN0aW9uPUdldFBsYXlJbmZvXHUwMDI2VmVyc2lvbj0yMDE5LTAzLTE1XHUwMDI2WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTZcdTAwMjZYLUFtei1DcmVkZW50aWFsPUFLTFRNek0xTUdJMFlUZzVOMlkwTkRjNFptRXlPVFl4TXpJeFpqWmpNV05qTnpnJTJGMjAyMDA2MjglMkZjbi1ub3J0aC0xJTJGdm9kJTJGYXdzNF9yZXF1ZXN0XHUwMDI2WC1BbXotRGF0ZT0yMDIwMDYyOFQxNTE1MzBaXHUwMDI2WC1BbXotRXhwaXJlcz0zbTBzXHUwMDI2WC1BbXotTm90U2lnbkJvZHk9XHUwMDI2WC1BbXotU2lnbmF0dXJlPWUyOGM2M2JjZTVmZDc1NmM2Y2QxOWJjMmViZTI0Mjk4NTBmODc2NjliNDk3ZTg0NjYzOWFlNzNlZGRmMzZlNGNcdTAwMjZYLUFtei1TaWduZWRIZWFkZXJzPVx1MDAyNlgtQW16LVNpZ25lZFF1ZXJpZXM9QWN0aW9uJTNCVmVyc2lvbiUzQlgtQW16LUFsZ29yaXRobSUzQlgtQW16LUNyZWRlbnRpYWwlM0JYLUFtei1EYXRlJTNCWC1BbXotRXhwaXJlcyUzQlgtQW16LU5vdFNpZ25Cb2R5JTNCWC1BbXotU2lnbmVkSGVhZGVycyUzQlgtQW16LVNpZ25lZFF1ZXJpZXMlM0Jjb2RlY190eXBlJTNCZm9ybWF0X3R5cGUlM0J2aWRlb19pZFx1MDAyNmNvZGVjX3R5cGU9NVx1MDAyNmZvcm1hdF90eXBlPWhsc1x1MDAyNnZpZGVvX2lkPXYwOTk0Mjc3MDAwMGJwaWl2NTM5cTBiOWQ2ZHFwc3VnIiwiVmVyc2lvbiI6InYxIn0=',
+    keyToken: 'HMAC-SHA1%3A1.0%3A1593357510%3AAKLTMzM1MGI0YTg5N2Y0NDc4ZmEyOTYxMzIxZjZjMWNjNzg%3AGIpA60%2B9EDlcP1MXCTeI%2BEpzmGg%3D',
+    audioURLWithCookie: false,
+    private: false,
+}
+```
 
 <a href="https://www.buymeacoffee.com/Usom2qC" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-blue.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
 

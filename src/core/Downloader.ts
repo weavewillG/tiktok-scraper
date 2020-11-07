@@ -11,7 +11,7 @@ import { SocksProxyAgent } from 'socks-proxy-agent';
 import { forEachLimit } from 'async';
 
 import { MultipleBar } from '../helpers';
-import { DownloaderConstructor, PostCollector, DownloadParams, Proxy } from '../types';
+import { DownloaderConstructor, PostCollector, DownloadParams, Proxy, Headers } from '../types';
 
 export class Downloader {
     public progress: boolean;
@@ -24,17 +24,17 @@ export class Downloader {
 
     public noWaterMark: boolean;
 
-    public userAgent: string;
-
     public filepath: string;
 
     public bulk: boolean;
 
-    constructor({ progress, proxy, noWaterMark, userAgent, filepath, bulk }: DownloaderConstructor) {
+    public headers: Headers;
+
+    constructor({ progress, proxy, noWaterMark, headers, filepath, bulk }: DownloaderConstructor) {
         this.progress = true || progress;
         this.progressBar = [];
         this.noWaterMark = noWaterMark;
-        this.userAgent = userAgent;
+        this.headers = headers;
         this.filepath = filepath;
         this.mbars = new MultipleBar();
         this.proxy = proxy;
@@ -68,9 +68,9 @@ export class Downloader {
      * Add new bar to indicate download progress
      * @param {number} len
      */
-    public addBar(len: number): any[] {
+    public addBar(type: boolean, len: number): any[] {
         this.progressBar.push(
-            this.mbars.newBar('Downloading :id [:bar] :percent', {
+            this.mbars.newBar(`Downloading (${!type ? 'WITH WM' : 'WITHOUT WM'}) :id [:bar] :percent`, {
                 complete: '=',
                 incomplete: ' ',
                 width: 30,
@@ -99,10 +99,11 @@ export class Downloader {
             }
             r.get({
                 url: item.videoUrlNoWaterMark ? item.videoUrlNoWaterMark : item.videoUrl,
+                headers: this.headers,
             })
                 .on('response', response => {
                     if (this.progress && !this.bulk) {
-                        barIndex = this.addBar(parseInt(response.headers['content-length'] as string, 10));
+                        barIndex = this.addBar(!!item.videoUrlNoWaterMark, parseInt(response.headers['content-length'] as string, 10));
                     }
                 })
                 .on('data', chunk => {
@@ -177,18 +178,21 @@ export class Downloader {
      */
     public async downloadSingleVideo(post: PostCollector) {
         const proxy = this.getProxy;
+        let url = post.videoUrlNoWaterMark;
+        if (!url) {
+            url = post.videoUrl;
+        }
         const options = ({
-            uri: post.videoUrlNoWaterMark,
+            uri: url,
+            method: 'GET',
+            headers: this.headers,
             encoding: null,
             ...(proxy.proxy && proxy.socks ? { agent: proxy.proxy } : {}),
             ...(proxy.proxy && !proxy.socks ? { proxy: `http://${proxy.proxy}/` } : {}),
         } as unknown) as OptionsWithUri;
-        try {
-            const result = await rp(options);
 
-            await fromCallback(cb => writeFile(`${this.filepath}/${post.id}.mp4`, result, cb));
-        } catch (error) {
-            throw error.message;
-        }
+        const result = await rp(options);
+
+        await fromCallback(cb => writeFile(`${this.filepath}/${post.id}.mp4`, result, cb));
     }
 }

@@ -35,26 +35,34 @@ const startScraper = async argv => {
         if (argv.async) {
             argv.asyncBulk = argv.async;
         }
-        const scraper = await TikTokScraper[argv.type](argv.input, argv);
 
-        if (scraper.zip) {
-            console.log(argv.zip ? `ZIP path: ${scraper.zip}` : `Folder Path: ${scraper.zip}`);
-        }
-        if (scraper.json) {
-            console.log(`JSON path: ${scraper.json}`);
-        }
-        if (scraper.csv) {
-            console.log(`CSV path: ${scraper.csv}`);
-        }
-        if (scraper.message) {
-            console.log(scraper.message);
-        }
-        if (scraper.webhook) {
-            console.log('HTTP REQUEST: ');
-            console.table(scraper.webhook);
-        }
-        if (scraper.table) {
-            console.table(scraper.table);
+        try {
+            const scraper = await TikTokScraper[argv.type](argv.input, argv);
+
+            if (scraper.zip) {
+                console.log(argv.zip ? `ZIP path: ${scraper.zip}` : `Folder Path: ${scraper.zip}`);
+            }
+            if (scraper.json) {
+                console.log(`JSON path: ${scraper.json}`);
+            }
+            if (scraper.csv) {
+                console.log(`CSV path: ${scraper.csv}`);
+            }
+            if (scraper.message) {
+                console.log(scraper.message);
+            }
+            if (scraper.webhook) {
+                console.log('HTTP REQUEST: ');
+                console.table(scraper.webhook);
+            }
+            if (scraper.table) {
+                console.table(scraper.table);
+            }
+            if (argv.cli && argv.type === 'getUserProfileInfo') {
+                console.log(scraper);
+            }
+        } catch (error) {
+            console.error(error.message);
         }
     } catch (error) {
         console.log(error);
@@ -91,6 +99,9 @@ yargs
         startScraper(argv);
     })
     .command('from-file [file] [async]', 'Scrape users, hashtags, music, videos mentioned in a file. 1 value per 1 lin', {}, argv => {
+        startScraper(argv);
+    })
+    .command('userprofile [id]', 'Show user metadata', {}, argv => {
         startScraper(argv);
     })
     .options({
@@ -242,6 +253,10 @@ yargs
             if (!argv.download && !argv.filetype) {
                 argv.filetype = 'csv';
             }
+        }
+
+        if (argv._[0] === 'userprofile') {
+            argv._[0] = 'getUserProfileInfo';
         }
 
         return true;
